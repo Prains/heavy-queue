@@ -42,7 +42,7 @@ See what's holding the slots:
 
 ## Limits
 
-- A cancelled tool call or a permission prompt you deny fires no `PostToolUse`, so its slot stays taken until the lease expires (`HEAVY_QUEUE_TTL`).
+- A call that ends without `PostToolUse` (denied by another hook, permission prompt refused, cancelled) keeps its slot until that agent runs its next heavy command or finishes its turn. If the turn was interrupted, the slot stays taken until the lease expires (`HEAVY_QUEUE_TTL`).
 - If a command is moved to the background mid-run, its slot is released at that moment.
 - Waiters poll once a second; there is no strict FIFO order.
 - A wait longer than an hour hits the hook timeout, and the command then runs without a slot.

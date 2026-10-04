@@ -2,7 +2,8 @@
 """Cap how many heavy Bash commands run at once across all Claude Code sessions.
 
   heavy-queue acquire   PreToolUse hook: wait for a free slot, then take a lease
-  heavy-queue release   PostToolUse/PostToolUseFailure hook: drop the lease
+  heavy-queue release   PostToolUse/PostToolUseFailure hook: drop the lease;
+                        Stop/SubagentStop hook: drop every lease of that agent
   heavy-queue status    list current leases
 
 The command itself is never rewritten, so permission rules keep matching it,
@@ -19,10 +20,15 @@ from pathlib import Path
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 STATE = Path(os.environ.get("HEAVY_QUEUE_DIR", Path.home() / ".cache" / "heavy-queue"))
 SLOTS = int(os.environ.get("HEAVY_QUEUE_SLOTS", max(1, (os.cpu_count() or 4) // 4)))
-# No Post* hook fires when a tool call is cancelled, so its lease lingers until it
-# expires. Foreground Bash commands are capped at 10 min, so older leases are stale.
+# Last resort for leases nobody released, e.g. a turn interrupted by the user. Must stay
+# above BASH_MAX_TIMEOUT_MS (10 min by default), or a long build loses its slot mid-run.
 TTL = int(os.environ.get("HEAVY_QUEUE_TTL", 15 * 60))
 USER_PATTERNS = Path.home() / ".config" / "heavy-queue" / "patterns"
+
+
+def owner(event):
+    """Leases are keyed by agent, so an agent's leftovers can be found and dropped."""
+    return re.sub(r"[^\w-]", "_", f"{event['session_id']}.{event.get('agent_id', 'main')}")
 
 
 def heavy_pattern():
@@ -54,11 +60,16 @@ def acquire(event):
     if tool_input.get("run_in_background") or not pattern or not pattern.search(command):
         return
     STATE.mkdir(parents=True, exist_ok=True)
-    lease = STATE / f"{event['tool_use_id']}.lease"
+    lease = STATE / f"{owner(event)}.{event['tool_use_id']}.lease"
     # ponytail: polling, not FIFO; add ordered tickets if waiters ever starve
     while True:
         with open(STATE / ".lock", "w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
+            # An agent runs its heavy commands one at a time, so a lease it still holds
+            # belongs to a call that ended without PostToolUse (denied by another hook,
+            # permission prompt refused, cancelled).
+            for p in STATE.glob(f"{owner(event)}.*.lease"):
+                p.unlink(missing_ok=True)
             if len(live_leases()) < SLOTS:
                 lease.write_text(command)
                 return
@@ -66,7 +77,9 @@ def acquire(event):
 
 
 def release(event):
-    (STATE / f"{event['tool_use_id']}.lease").unlink(missing_ok=True)
+    tool_use_id = event.get("tool_use_id", "*")
+    for p in STATE.glob(f"{owner(event)}.{tool_use_id}.lease"):
+        p.unlink(missing_ok=True)
 
 
 def status():

@@ -9,38 +9,61 @@ from pathlib import Path
 BIN = Path(__file__).parent / "bin" / "heavy-queue"
 
 
-def run(action, tool_use_id, command, env, **extra):
-    event = {"tool_use_id": tool_use_id, "tool_input": {"command": command, **extra}}
-    return subprocess.Popen([BIN, action], stdin=subprocess.PIPE, env=env, text=True), json.dumps(event)
-
-
-def call(action, tool_use_id, command, env, **extra):
-    proc, payload = run(action, tool_use_id, command, env, **extra)
-    proc.communicate(payload)
+def start(action, env, session="s1", tool_use_id=None, command=None, **extra):
+    event = {"session_id": session, **extra.pop("agent", {})}
+    if tool_use_id:
+        event |= {"tool_use_id": tool_use_id, "tool_input": {"command": command, **extra}}
+    proc = subprocess.Popen([BIN, action], stdin=subprocess.PIPE, env=env, text=True)
+    proc.stdin.write(json.dumps(event))
+    proc.stdin.close()
     return proc
+
+
+def call(*args, **kwargs):
+    proc = start(*args, **kwargs)
+    assert proc.wait(timeout=5) == 0
+    return proc
+
+
+def leases(state):
+    return sorted(p.name for p in Path(state).glob("*.lease"))
 
 
 with tempfile.TemporaryDirectory() as state:
     env = {**os.environ, "HEAVY_QUEUE_DIR": state, "HEAVY_QUEUE_SLOTS": "1"}
 
     # light and background commands never wait
-    call("acquire", "a", "cargo build", env)
+    call("acquire", env, "s1", "a", "cargo build")
     t = time.time()
-    call("acquire", "x", "git status", env)
-    call("acquire", "y", "cargo test", env, run_in_background=True)
+    call("acquire", env, "s2", "x", "git status")
+    call("acquire", env, "s2", "y", "cargo test", run_in_background=True)
     assert time.time() - t < 1
 
-    # a second heavy command waits until the first releases its slot
-    waiter, payload = run("acquire", "b", "npm test", env)
-    waiter.stdin.write(payload)
-    waiter.stdin.close()
+    # another agent's heavy command waits until the slot is released
+    waiter = start("acquire", env, "s2", "b", "npm test")
     time.sleep(2)
     assert waiter.poll() is None, "should be waiting for a slot"
-    call("release", "a", "cargo build", env)
+    call("release", env, "s1", "a", "cargo build")
     assert waiter.wait(timeout=3) == 0
+    assert leases(state) == ["s2_main.b.lease"]
 
-    # a stale lease (cancelled tool call) is reclaimed after the TTL
-    call("acquire", "c", "make", {**env, "HEAVY_QUEUE_TTL": "0"})
-    assert sorted(p.name for p in Path(state).glob("*.lease")) == ["c.lease"]
+    # the same agent's next heavy command drops its leftover lease instead of waiting on it
+    call("acquire", env, "s2", "c", "make")
+    assert leases(state) == ["s2_main.c.lease"]
+
+    # Stop releases the main agent's leases, SubagentStop only that subagent's
+    call("release", env, "s2")
+    assert leases(state) == []
+    call("acquire", {**env, "HEAVY_QUEUE_SLOTS": "2"}, "s3", "d", "make", agent={"agent_id": "sub1"})
+    call("acquire", {**env, "HEAVY_QUEUE_SLOTS": "2"}, "s3", "g", "make")
+    call("release", env, "s3", agent={"agent_id": "sub1"})
+    assert leases(state) == ["s3_main.g.lease"]
+    call("release", env, "s3")
+    assert leases(state) == []
+
+    # a lease nobody released is reclaimed after the TTL
+    call("acquire", env, "s4", "e", "make")
+    call("acquire", {**env, "HEAVY_QUEUE_TTL": "0"}, "s5", "f", "make")
+    assert leases(state) == ["s5_main.f.lease"]
 
 print("ok")
