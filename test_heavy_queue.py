@@ -36,6 +36,7 @@ with tempfile.TemporaryDirectory() as state:
     call("acquire", env, "s1", "a", "cargo build")
     t = time.time()
     call("acquire", env, "s2", "x", "git status")
+    call("acquire", env, "s2", "z", "cat vitest.config.ts | grep 'make'")
     call("acquire", env, "s2", "y", "cargo test", run_in_background=True)
     assert time.time() - t < 1
 
@@ -65,5 +66,14 @@ with tempfile.TemporaryDirectory() as state:
     call("acquire", env, "s4", "e", "make")
     call("acquire", {**env, "HEAVY_QUEUE_TTL": "0"}, "s5", "f", "make")
     assert leases(state) == ["s5_main.f.lease"]
+    call("release", env, "s5")
+
+    # a project's .claude/heavy-queue-patterns adds to the defaults
+    with tempfile.TemporaryDirectory() as project:
+        (Path(project) / ".claude").mkdir()
+        (Path(project) / ".claude" / "heavy-queue-patterns").write_text("# comment\n\\bnuxi\\s+prepare\\b\n")
+        call("acquire", {**env, "CLAUDE_PROJECT_DIR": project}, "s6", "h", "bunx nuxi prepare")
+        call("acquire", {**env, "CLAUDE_PROJECT_DIR": project}, "s7", "i", "git status")
+        assert leases(state) == ["s6_main.h.lease"]
 
 print("ok")

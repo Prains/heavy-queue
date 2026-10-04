@@ -1,15 +1,16 @@
-# Commands that take a slot. One Python regex per line, searched anywhere in the Bash command.
-# To customize, copy this file to ~/.config/heavy-queue/patterns and edit it there.
-\bcargo\s+(build|b|test|t|run|r|check|c|clippy|bench|nextest|install)\b
-\bgo\s+(build|test|vet|install)\b
-\bswift\s+(build|test)\b
-\bxcodebuild\b
-\btauri(\s+|:)build\b
-\b(make|ninja|bazel|gradlew?|mvnw?)\b
-\bcmake\s+--build\b
-\b(npm|pnpm|yarn|bun)\s+(run\s+)?(build|test|typecheck|lint|mutation|install|i|ci)\b
-\b(tsc|vitest|jest|playwright|webpack)\b
-\b(next|vite|nuxt|nuxi|astro)\s+build\b
-\b(pytest|tox|nox|mypy|stryker)\b
-\bturbo\s+(run\s+)?(build|test|typecheck|lint|check|mutation)\b
-\bdocker\s+(build|compose\s+build|buildx\s+build)\b
+# Commands that take a slot. One Python regex per line, searched in the Bash command.
+# {cmd} matches where a command starts: line start or after ; & | ( $(, past env vars,
+# timeout/time/nice, runners like npx/bunx/pnpm exec/uv run, and paths like node_modules/.bin/.
+# To customize, copy this file to ~/.config/heavy-queue/patterns and edit it there,
+# or add project-specific lines to .claude/heavy-queue-patterns in the repo.
+{cmd}cargo\s+(build|b|test|t|run|r|check|c|clippy|bench|nextest|install)\b
+{cmd}go\s+(build|test|vet|install)\b
+{cmd}swift\s+(build|test)\b
+{cmd}(xcodebuild|make|ninja|bazel|gradlew?|mvnw?)\b
+{cmd}cmake\s+--build\b
+{cmd}(npm|pnpm|yarn|bun)\s+(run\s+)?(build|test|typecheck|lint|mutation|install|i|ci)\b(?!:(watch|ui|dev)\b)
+{cmd}turbo\s+(run\s+)?(build|test|typecheck|lint|check|mutation)\b(?!:(watch|ui|dev)\b)
+{cmd}(tsc|vue-tsc|vitest|jest|playwright|webpack|pytest|tox|nox|mypy|stryker)\b
+{cmd}(next|vite|nuxt|nuxi|astro)\s+build\b
+{cmd}((npm|pnpm|yarn|bun)\s+(run\s+)?)?tauri(\s+|:)build\b
+{cmd}docker\s+(build|compose\s+build|buildx\s+build)\b

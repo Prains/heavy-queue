@@ -24,6 +24,13 @@ SLOTS = int(os.environ.get("HEAVY_QUEUE_SLOTS", max(1, (os.cpu_count() or 4) // 
 # above BASH_MAX_TIMEOUT_MS (10 min by default), or a long build loses its slot mid-run.
 TTL = int(os.environ.get("HEAVY_QUEUE_TTL", 15 * 60))
 USER_PATTERNS = Path.home() / ".config" / "heavy-queue" / "patterns"
+# `{cmd}` in a pattern: where a command starts, so `cat vitest.config.ts` doesn't count as vitest.
+CMD = (
+    r"(?:^|(?<!\\)[;&|(\n]|\$\()\s*"
+    r"(?:\w+=\S*\s+|(?:timeout|gtimeout)\s+\S+\s+|(?:time|nice|env|exec)\s+)*"
+    r"(?:(?:npx|bunx|bun\s+x|bun|pnpm\s+(?:exec|dlx)|yarn|uv\s+run|poetry\s+run|python3?\s+-m)\s+(?:-\S+\s+)*)?"
+    r"(?:\S*/)?"
+)
 
 
 def owner(event):
@@ -32,9 +39,11 @@ def owner(event):
 
 
 def heavy_pattern():
-    f = USER_PATTERNS if USER_PATTERNS.exists() else PLUGIN_ROOT / "patterns"
-    lines = [l.strip() for l in f.read_text().splitlines()]
-    lines = [l for l in lines if l and not l.startswith("#")]
+    files = [USER_PATTERNS if USER_PATTERNS.exists() else PLUGIN_ROOT / "patterns"]
+    # A project can add its own patterns on top, committed with the repo.
+    files.append(Path(os.environ.get("CLAUDE_PROJECT_DIR", ".")) / ".claude" / "heavy-queue-patterns")
+    lines = [l.strip() for f in files if f.exists() for l in f.read_text().splitlines()]
+    lines = [l.replace("{cmd}", CMD) for l in lines if l and not l.startswith("#")]
     return re.compile("|".join(f"(?:{l})" for l in lines)) if lines else None
 
 

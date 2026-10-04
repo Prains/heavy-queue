@@ -1,6 +1,6 @@
 {
   "name": "heavy-queue",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Queue heavy builds and tests so parallel Claude Code agents don't fight over CPU and RAM",
   "author": { "name": "Prains" },
   "repository": "https://github.com/Prains/heavy-queue",

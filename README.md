@@ -32,7 +32,14 @@ Set these in the `env` block of `~/.claude/settings.json` or in your shell:
 | `HEAVY_QUEUE_TTL` | `900` | Seconds after which a lease is considered abandoned. Keep it above `BASH_MAX_TIMEOUT_MS` if you raised that |
 | `HEAVY_QUEUE_DIR` | `~/.cache/heavy-queue` | Where leases live |
 
-Which commands count as heavy is a list of regexes in [`patterns`](patterns). To change it, copy that file to `~/.config/heavy-queue/patterns` and edit it.
+Which commands count as heavy is a list of regexes in [`patterns`](patterns). `{cmd}` in a pattern matches where a command starts, so `cat vitest.config.ts` doesn't count as running vitest. To change the list, copy that file to `~/.config/heavy-queue/patterns` and edit it.
+
+A project can add its own patterns in `.claude/heavy-queue-patterns`, committed with the repo. They apply on top of the default or user list:
+
+```
+# any turbo task except dev servers
+{cmd}turbo\s+run\s+(?!dev\b)
+```
 
 See what's holding the slots:
 
