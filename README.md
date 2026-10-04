@@ -29,7 +29,7 @@ Set these in the `env` block of `~/.claude/settings.json` or in your shell:
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `HEAVY_QUEUE_SLOTS` | CPU cores / 4 | How many heavy commands may run at once |
-| `HEAVY_QUEUE_TTL` | `900` | Seconds after which a lease is considered abandoned |
+| `HEAVY_QUEUE_TTL` | `900` | Seconds after which a lease is considered abandoned. Keep it above `BASH_MAX_TIMEOUT_MS` if you raised that |
 | `HEAVY_QUEUE_DIR` | `~/.cache/heavy-queue` | Where leases live |
 
 Which commands count as heavy is a list of regexes in [`patterns`](patterns). To change it, copy that file to `~/.config/heavy-queue/patterns` and edit it.
@@ -37,12 +37,12 @@ Which commands count as heavy is a list of regexes in [`patterns`](patterns). To
 See what's holding the slots:
 
 ```sh
-~/.claude/plugins/cache/heavy-queue/heavy-queue/*/bin/heavy-queue status
+"$(ls -d ~/.claude/plugins/cache/heavy-queue/heavy-queue/*/ | tail -1)"bin/heavy-queue status
 ```
 
 ## Limits
 
-- A cancelled tool call fires no `PostToolUse`, so its slot stays taken until the lease expires (`HEAVY_QUEUE_TTL`).
+- A cancelled tool call or a permission prompt you deny fires no `PostToolUse`, so its slot stays taken until the lease expires (`HEAVY_QUEUE_TTL`).
 - If a command is moved to the background mid-run, its slot is released at that moment.
 - Waiters poll once a second; there is no strict FIFO order.
 - A wait longer than an hour hits the hook timeout, and the command then runs without a slot.
