@@ -1,0 +1,14 @@
+{
+  "name": "heavy-queue",
+  "description": "Queue heavy builds and tests across parallel Claude Code agents",
+  "owner": {
+    "name": "Prains"
+  },
+  "plugins": [
+    {
+      "name": "heavy-queue",
+      "source": "./",
+      "description": "Queue heavy builds and tests so parallel Claude Code agents don't fight over CPU and RAM"
+    }
+  ]
+}

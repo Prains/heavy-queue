@@ -1,0 +1,13 @@
+# Commands that take a slot. One Python regex per line, searched anywhere in the Bash command.
+# To customize, copy this file to ~/.config/heavy-queue/patterns and edit it there.
+\bcargo\s+(build|b|test|t|run|r|check|c|clippy|bench|nextest|install)\b
+\bgo\s+(build|test|vet|install)\b
+\bswift\s+(build|test)\b
+\bxcodebuild\b
+\b(make|ninja|bazel|gradlew?|mvnw?)\b
+\bcmake\s+--build\b
+\b(npm|pnpm|yarn|bun)\s+(run\s+)?(build|test|typecheck|lint|install|i|ci)\b
+\b(tsc|vitest|jest|playwright|webpack)\b
+\b(next|vite|nuxt|nuxi|astro)\s+build\b
+\b(pytest|tox|nox|mypy)\b
+\bdocker\s+(build|compose\s+build|buildx\s+build)\b
